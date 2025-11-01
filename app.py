@@ -1,77 +1,106 @@
-from flask import Flask, render_template, request, jsonify
-import requests
+from flask import Flask, request, jsonify, render_template
+import os
 import openai
+from datetime import datetime
 
 app = Flask(__name__)
 
-# ---- CONFIG ----
-# Get your tokens from environment variables or hardcode temporarily for testing.
-# ⚠️ Never hardcode secrets in production.
-WHATSAPP_TOKEN = "YOUR_WHATSAPP_CLOUD_API_TOKEN"
-PHONE_NUMBER_ID = "YOUR_PHONE_NUMBER_ID"  # from Meta App Dashboard
-OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
-
+# ===============================
+# CONFIGURATION
+# ===============================
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "mywhatsapptoken")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
+# Store messages in memory for now
+messages = []
 
-# ---- ROUTES ----
+# ===============================
+# ROUTES
+# ===============================
+
 @app.route('/')
 def home():
-    return render_template('index.html')
+    """Display summarized WhatsApp messages."""
+    return render_template("index.html", messages=messages)
+
+@app.route('/webhook', methods=['GET', 'POST'])
+def whatsapp_webhook():
+    if request.method == 'GET':
+        # Meta verification
+        mode = request.args.get('hub.mode')
+        token = request.args.get('hub.verify_token')
+        challenge = request.args.get('hub.challenge')
+        
+        print("🟢 VERIFY REQUEST RECEIVED:")
+        print(f"Mode: {mode}")
+        print(f"Token received from Meta: {token}")
+        print(f"Expected VERIFY_TOKEN: {VERIFY_TOKEN}")
+        print(f"Challenge: {challenge}")
+
+        if mode == 'subscribe' and token == VERIFY_TOKEN:
+            print("✅ Verification success! Returning challenge...")
+            return challenge, 200
+        else:
+            print("❌ Verification failed!")
+            return "Forbidden", 403
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        print("\n📨 Incoming webhook data:")
+        print(data)
+
+        try:
+            entry = data["entry"][0]["changes"][0]["value"]
+            if "messages" in entry:
+                msg = entry["messages"][0]
+                sender = msg["from"]
+                text = msg["text"]["body"]
+
+                print(f"\n📩 New message from {sender}: {text}")
+
+                # Generate summary using OpenAI
+                summary = summarize_message(text)
+
+                # Store summary in memory
+                messages.append({
+                    "sender": sender,
+                    "text": text,
+                    "summary": summary,
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                })
+
+        except Exception as e:
+            print("⚠️ Error processing message:", e)
+
+        return jsonify({"status": "received"}), 200
 
 
-@app.route('/connect', methods=['POST'])
-def connect_whatsapp():
-    """Simulate WhatsApp Business connection."""
-    data = request.json
-    number = data.get("number")
+# ===============================
+# HELPER FUNCTIONS
+# ===============================
 
-    if not number:
-        return jsonify({"error": "No number provided"}), 400
-
-    # Here, you could verify the number via the Cloud API
-    # For demo: assume it’s successfully linked
-    return jsonify({"message": f"Connected successfully to {number}!"})
-
-
-@app.route('/summarize', methods=['POST'])
-def summarize_messages():
-    """Fetch messages from WhatsApp and summarize them."""
+def summarize_message(text):
+    """Use OpenAI API to summarize a WhatsApp message."""
     try:
-        # Step 1: Fetch messages from WhatsApp Cloud API
-        url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
-        headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
-        # You can replace with actual message fetch or mock sample:
-        response = requests.get(url, headers=headers)
-
-        if response.status_code != 200:
-            return jsonify({"error": "Failed to fetch messages from WhatsApp."}), 500
-
-        # For demo, we’ll mock messages
-        chats = [
-            "Hey, can we reschedule the meeting to tomorrow?",
-            "Your package has been shipped. Tracking ID: 12345.",
-            "Don’t forget to submit the report by EOD."
-        ]
-
-        # Step 2: Summarize using OpenAI
-        prompt = "Summarize these WhatsApp messages in a short, clear paragraph:\n\n" + "\n".join(chats)
-
-        summary_response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
+        prompt = f"Summarize this WhatsApp message briefly:\n\n{text}"
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=150
+            temperature=0.5,
         )
-
-        summary = summary_response["choices"][0]["message"]["content"]
-
-        return jsonify({"summary": summary})
-
+        return response.choices[0].message["content"].strip()
     except Exception as e:
-        print(e)
-        return jsonify({"error": "An error occurred while summarizing."}), 500
+        print("⚠️ OpenAI error:", e)
+        return "(Summary unavailable)"
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# ===============================
+# MAIN ENTRY
+# ===============================
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
 
