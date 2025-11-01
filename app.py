@@ -1,51 +1,50 @@
 from flask import Flask, request, jsonify, render_template
 import os
-import openai
 from datetime import datetime
+from transformers import pipeline
 
 app = Flask(__name__)
 
-# ===============================
-# CONFIGURATION
-# ===============================
+# -----------------------------
+# CONFIG
+# -----------------------------
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "mywhatsapptoken")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
 
-# Store messages in memory for now
+# Temporary in-memory data
 messages = []
 
-# ===============================
-# ROUTES
-# ===============================
-
+# -----------------------------
+# HOME PAGE
+# -----------------------------
 @app.route('/')
 def home():
-    """Display summarized WhatsApp messages."""
-    return render_template("index.html", messages=messages)
+    return render_template("index.html")
 
+# -----------------------------
+# WEBHOOK HANDLER (META)
+# -----------------------------
 @app.route('/webhook', methods=['GET', 'POST'])
 def whatsapp_webhook():
     if request.method == 'GET':
-        # Meta verification
+        # Meta verification step
         mode = request.args.get('hub.mode')
         token = request.args.get('hub.verify_token')
         challenge = request.args.get('hub.challenge')
-        
+
         print("🟢 VERIFY REQUEST RECEIVED:")
         print(f"Mode: {mode}")
-        print(f"Token received from Meta: {token}")
-        print(f"Expected VERIFY_TOKEN: {VERIFY_TOKEN}")
-        print(f"Challenge: {challenge}")
+        print(f"Token received: {token}")
+        print(f"Expected: {VERIFY_TOKEN}")
 
         if mode == 'subscribe' and token == VERIFY_TOKEN:
             print("✅ Verification success! Returning challenge...")
             return challenge, 200
         else:
-            print("❌ Verification failed!")
+            print("❌ Verification failed.")
             return "Forbidden", 403
 
     elif request.method == 'POST':
+        # Handle incoming WhatsApp message
         data = request.get_json()
         print("\n📨 Incoming webhook data:")
         print(data)
@@ -57,16 +56,11 @@ def whatsapp_webhook():
                 sender = msg["from"]
                 text = msg["text"]["body"]
 
-                print(f"\n📩 New message from {sender}: {text}")
+                print(f"\n📩 Message from {sender}: {text}")
 
-                # Generate summary using OpenAI
-                summary = summarize_message(text)
-
-                # Store summary in memory
                 messages.append({
                     "sender": sender,
                     "text": text,
-                    "summary": summary,
                     "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
 
@@ -75,32 +69,54 @@ def whatsapp_webhook():
 
         return jsonify({"status": "received"}), 200
 
+# -----------------------------
+# FETCH MESSAGES ENDPOINT
+# -----------------------------
+@app.route("/get_messages")
+def get_messages():
+    return jsonify({"messages": messages})
 
-# ===============================
-# HELPER FUNCTIONS
-# ===============================
+# -----------------------------
+# SUMMARIZATION ENDPOINT
+# -----------------------------
+@app.route('/summarize', methods=['POST'])
+def summarize_all():
+    if not messages:
+        return jsonify({"error": "No messages received yet."}), 400
 
-def summarize_message(text):
-    """Use OpenAI API to summarize a WhatsApp message."""
+    all_text = "\n".join([m["text"] for m in messages])
     try:
-        prompt = f"Summarize this WhatsApp message briefly:\n\n{text}"
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.5,
-        )
-        return response.choices[0].message["content"].strip()
+        summary = summarize_text(all_text)
+        print("🧠 Summary generated successfully.")
+        return jsonify({"summary": summary})
     except Exception as e:
-        print("⚠️ OpenAI error:", e)
-        return "(Summary unavailable)"
+        print("⚠️ Summarization error:", e)
+        return jsonify({"error": "Failed to generate summary."}), 500
 
+# -----------------------------
+# SUMMARIZER FUNCTION
+# -----------------------------
+print("⚙️ Loading summarization model...")
+summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
 
-# ===============================
+def summarize_text(text):
+    text = text.strip()
+    if len(text) < 20:
+        return "Not enough content to summarize."
+
+    try:
+        summary = summarizer(text, max_length=120, min_length=25, do_sample=False)
+        return summary[0]['summary_text']
+    except Exception as e:
+        print("⚠️ Summarization error:", e)
+        return "Failed to generate summary."
+
+# -----------------------------
 # MAIN ENTRY
-# ===============================
-
+# -----------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
 
