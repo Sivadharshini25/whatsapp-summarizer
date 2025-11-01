@@ -3,127 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Summarizer</title>
+    <title>WhatsApp Message Summarizer</title>
     <style>
         body {
-            font-family: "Segoe UI", sans-serif;
-            background-color: #f5f7fa;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
+            font-family: Arial, sans-serif;
+            background-color: #f2f5f7;
+            padding: 40px;
+            color: #222;
         }
         h1 {
-            color: #2e86de;
+            text-align: center;
+            color: #333;
         }
         button {
-            background-color: #2e86de;
-            color: white;
-            border: none;
             padding: 10px 20px;
             margin: 10px;
-            border-radius: 8px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
             cursor: pointer;
-            transition: background-color 0.3s ease;
         }
         button:hover {
-            background-color: #1b4f72;
+            background-color: #0056b3;
         }
-        #messages, #summary {
-            background-color: white;
-            border-radius: 10px;
+        pre {
+            background: white;
+            border-radius: 8px;
             padding: 15px;
-            margin: 20px auto;
-            width: 80%;
-            max-width: 600px;
-            box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
-            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
         }
-        .message {
-            border-bottom: 1px solid #ddd;
-            padding: 8px 0;
-        }
-        .message:last-child {
-            border-bottom: none;
-        }
-        .sender {
-            font-weight: bold;
-            color: #2e86de;
-        }
-        .time {
-            color: gray;
-            font-size: 12px;
-        }
-        .loading {
-            color: #888;
-            font-style: italic;
+        #output {
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
-    <h1>💬 WhatsApp Message Summarizer</h1>
 
-    <button onclick="showMessages()">Show Messages</button>
-    <button onclick="summarizeMessages()">Summarize</button>
+    <h1>📱 WhatsApp Summarizer</h1>
 
-    <div id="messages">
-        <p class="loading">No messages yet. Click "Show Messages" to load them.</p>
+    <div style="text-align: center;">
+        <button onclick="showMessages()">Show Messages</button>
+        <button onclick="summarizeMessages()">Summarize</button>
     </div>
 
-    <div id="summary">
-        <h3>Summary:</h3>
-        <p class="loading">No summary generated yet.</p>
-    </div>
+    <div id="output"></div>
 
     <script>
         async function showMessages() {
-            const messagesDiv = document.getElementById("messages");
-            messagesDiv.innerHTML = "<p class='loading'>Loading messages...</p>";
+            const res = await fetch('/get_messages');
+            const data = await res.json();
 
-            try {
-                const response = await fetch("/get_messages");
-                const data = await response.json();
-                const messages = data.messages;
-
-                if (!messages.length) {
-                    messagesDiv.innerHTML = "<p class='loading'>No messages received yet.</p>";
-                    return;
-                }
-
-                messagesDiv.innerHTML = messages.map(m => `
-                    <div class="message">
-                        <span class="sender">${m.sender}</span><br>
-                        ${m.text}<br>
-                        <span class="time">${m.time}</span>
-                    </div>
-                `).join("");
-
-            } catch (err) {
-                messagesDiv.innerHTML = "<p class='loading'>⚠️ Failed to fetch messages.</p>";
-                console.error(err);
+            let html = "<h3>📨 All Messages:</h3><pre>";
+            if (data.messages && data.messages.length > 0) {
+                data.messages.forEach(msg => {
+                    html += `${msg.sender}: ${msg.text} (${msg.time})\n`;
+                });
+            } else {
+                html += "No messages yet.";
             }
+            html += "</pre>";
+
+            document.getElementById('output').innerHTML = html;
         }
 
         async function summarizeMessages() {
-            const summaryDiv = document.getElementById("summary");
-            summaryDiv.innerHTML = "<p class='loading'>Summarizing... please wait.</p>";
+            const res = await fetch('/summarize', { method: 'POST' });
+            const data = await res.json();
 
-            try {
-                const response = await fetch("/summarize", { method: "POST" });
-                const data = await response.json();
+            let html = "<h3>🧠 Summary:</h3><pre>";
+            html += data.summary ? data.summary : data.error;
+            html += "</pre>";
 
-                if (data.error) {
-                    summaryDiv.innerHTML = `<p class='loading'>⚠️ ${data.error}</p>`;
-                } else {
-                    summaryDiv.innerHTML = `<p>${data.summary}</p>`;
-                }
-            } catch (err) {
-                summaryDiv.innerHTML = "<p class='loading'>⚠️ Failed to summarize messages.</p>";
-                console.error(err);
-            }
+            document.getElementById('output').innerHTML = html;
         }
     </script>
+
 </body>
 </html>
+
 
 
 
