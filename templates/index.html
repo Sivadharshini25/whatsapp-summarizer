@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WISE - WhatsApp Summarizer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Times New Roman', serif;
+      background-color: #f9f8f3; /* cream */
+      color: #2e473b; /* dusty green */
+      scroll-behavior: smooth;
+    }
+
+    /* NAVBAR */
+    nav {
+      background-color: #3b5f4b; /* dusty green */
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 40px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    nav h1 {
+      font-size: 1.8rem;
+      letter-spacing: 1px;
+    }
+
+    nav button {
+      background-color: #f9f8f3; /* cream */
+      color: #3b5f4b;
+      border: none;
+      padding: 10px 18px;
+      font-family: 'Times New Roman', serif;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    nav button:hover {
+      background-color: #e6ede4;
+      transform: scale(1.05);
+    }
+
+    /* HERO SECTION */
+    .hero {
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(to bottom, #e6ede4 40%, #f9f8f3 100%);
+    }
+
+    .hero h2 {
+      font-size: 2.5rem;
+      color: #2e473b;
+      margin-bottom: 15px;
+    }
+
+    .hero p {
+      font-size: 1.2rem;
+      width: 60%;
+      line-height: 1.6;
+      color: #3e5c4b;
+    }
+
+    .scroll-down {
+      margin-top: 40px;
+      font-size: 1rem;
+      color: #3b5f4b;
+      text-decoration: none;
+      border: 1px solid #3b5f4b;
+      padding: 10px 20px;
+      border-radius: 6px;
+      transition: 0.3s;
+    }
+
+    .scroll-down:hover {
+      background-color: #3b5f4b;
+      color: #fff;
+    }
+
+    /* ABOUT SECTION */
+    .about {
+      padding: 80px 60px;
+      background-color: #f9f8f3;
+      text-align: center;
+    }
+
+    .about h3 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+      color: #2e473b;
+    }
+
+    .about p {
+      font-size: 1.1rem;
+      width: 70%;
+      margin: 0 auto;
+      line-height: 1.8;
+      color: #3e5c4b;
+    }
+
+    /* SIGN-UP POPUP */
+    .popup {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+    }
+
+    .popup-content {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      width: 350px;
+    }
+
+    .popup-content h4 {
+      color: #2e473b;
+      margin-bottom: 15px;
+    }
+
+    .popup-content input {
+      width: 90%;
+      padding: 10px;
+      margin-bottom: 15px;
+      font-family: 'Times New Roman', serif;
+      border: 1px solid #b8c3b5;
+      border-radius: 6px;
+    }
+
+    .popup-content button {
+      padding: 10px 20px;
+      background-color: #3b5f4b;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .popup-content button:hover {
+      background-color: #345243;
+    }
+  </style>
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav>
+    <h1>WISE</h1>
+    <button onclick="openPopup()">Sign Up</button>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <h2>Summarize Your WhatsApp Chats Effortlessly 📱</h2>
+    <p>WISE intelligently summarizes your WhatsApp Business messages, helping you stay focused, informed, and organized — all in one place.</p>
+    <a href="#about" class="scroll-down">Learn More ↓</a>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="about" id="about">
+    <h3>About WISE</h3>
+    <p>WISE (WhatsApp Intelligent Summarizer & Event Tracker) uses AI to summarize unread WhatsApp Business chats, extract important updates, and track conversations efficiently. 
+       Whether you manage customers or coordinate events, WISE ensures you never miss key information — with intelligent summaries powered by GPT.</p>
+  </section>
+
+  <!-- SIGN-UP POPUP -->
+  <div class="popup" id="signupPopup">
+    <div class="popup-content">
+      <h4>Connect Your WhatsApp Business</h4>
+      <input type="text" id="businessNumber" placeholder="Enter Business WhatsApp Number">
+      <button onclick="connectAccount()">Connect</button>
+      <br><br>
+      <button onclick="closePopup()">Cancel</button>
+    </div>
+  </div>
+
+  <script>
+  function openPopup() {
+    document.getElementById("signupPopup").style.display = "flex";
+  }
+  function closePopup() {
+    document.getElementById("signupPopup").style.display = "none";
+  }
+
+  async function connectAccount() {
+    const number = document.getElementById("businessNumber").value.trim();
+    if (!number) {
+      alert("Please enter your WhatsApp Business number.");
+      return;
+    }
+
+    const response = await fetch("/connect", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ number })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      alert("✅ " + result.message);
+      closePopup();
+      showSummarizeSection();
+    } else {
+      alert("❌ " + result.error);
+    }
+  }
+
+  function showSummarizeSection() {
+    const section = document.createElement("section");
+    section.style.textAlign = "center";
+    section.style.padding = "60px";
+    section.innerHTML = `
+      <h3>Summarize WhatsApp Chats</h3>
+      <p>Click below to summarize your latest WhatsApp Business messages.</p>
+      <button id="summarizeBtn" style="
+        background-color:#3b5f4b;color:#fff;padding:10px 20px;
+        border:none;border-radius:6px;cursor:pointer;font-family:'Times New Roman',serif;">
+        Generate Summary
+      </button>
+      <div id="summaryResult" style="margin-top:25px;color:#2e473b;font-size:1.1rem;"></div>
+    `;
+    document.body.appendChild(section);
+
+    document.getElementById("summarizeBtn").addEventListener("click", async () => {
+      const res = await fetch("/summarize", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById("summaryResult").innerText = "🧠 Summary: " + data.summary;
+      } else {
+        document.getElementById("summaryResult").innerText = "❌ " + data.error;
+      }
+    });
+  }
+</script>
+
+</body>
+</html>
+
+
+
