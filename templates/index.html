@@ -1,87 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WISE - WhatsApp Summarizer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Summarizer</title>
     <style>
         body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f4f6f8;
-            color: #333;
+            font-family: "Segoe UI", sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 20px;
             text-align: center;
-            padding: 40px;
         }
         h1 {
-            color: #0066cc;
-            margin-bottom: 20px;
+            color: #2e86de;
         }
         button {
-            background-color: #0066cc;
+            background-color: #2e86de;
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 10px 20px;
+            margin: 10px;
             border-radius: 8px;
             cursor: pointer;
-            margin: 10px;
-            font-size: 16px;
+            transition: background-color 0.3s ease;
         }
         button:hover {
-            background-color: #004d99;
+            background-color: #1b4f72;
         }
         #messages, #summary {
-            background: #fff;
-            border-radius: 8px;
-            padding: 20px;
-            width: 80%;
+            background-color: white;
+            border-radius: 10px;
+            padding: 15px;
             margin: 20px auto;
+            width: 80%;
+            max-width: 600px;
+            box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
             text-align: left;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        .message {
+            border-bottom: 1px solid #ddd;
+            padding: 8px 0;
+        }
+        .message:last-child {
+            border-bottom: none;
+        }
+        .sender {
+            font-weight: bold;
+            color: #2e86de;
+        }
+        .time {
+            color: gray;
+            font-size: 12px;
+        }
+        .loading {
+            color: #888;
+            font-style: italic;
         }
     </style>
 </head>
 <body>
-    <h1>💬 WISE - WhatsApp Summarizer</h1>
-    <button id="showMessagesBtn">Show Messages</button>
-    <button id="summarizeBtn">Summarize</button>
+    <h1>💬 WhatsApp Message Summarizer</h1>
 
-    <div id="messages" style="display:none;">
-        <h3>📩 All Messages:</h3>
-        <pre id="messagesContent"></pre>
+    <button onclick="showMessages()">Show Messages</button>
+    <button onclick="summarizeMessages()">Summarize</button>
+
+    <div id="messages">
+        <p class="loading">No messages yet. Click "Show Messages" to load them.</p>
     </div>
 
-    <div id="summary" style="display:none;">
-        <h3>🧠 Summary:</h3>
-        <pre id="summaryContent"></pre>
+    <div id="summary">
+        <h3>Summary:</h3>
+        <p class="loading">No summary generated yet.</p>
     </div>
 
     <script>
-        // Show all messages
-        document.getElementById("showMessagesBtn").addEventListener("click", async () => {
-            const res = await fetch("/get_messages");
-            const data = await res.json();
-            const container = document.getElementById("messages");
-            container.style.display = "block";
-            document.getElementById("messagesContent").textContent = 
-                data.messages.length ? data.messages.map(m => `${m.time} - ${m.sender}: ${m.text}`).join("\n") 
-                : "No messages received yet.";
-        });
+        async function showMessages() {
+            const messagesDiv = document.getElementById("messages");
+            messagesDiv.innerHTML = "<p class='loading'>Loading messages...</p>";
 
-        // Summarize all messages
-        document.getElementById("summarizeBtn").addEventListener("click", async () => {
-            const res = await fetch("/summarize", { method: "POST" });
-            const data = await res.json();
-            const container = document.getElementById("summary");
-            container.style.display = "block";
-            document.getElementById("summaryContent").textContent = data.summary || data.error;
-        });
+            try {
+                const response = await fetch("/get_messages");
+                const data = await response.json();
+                const messages = data.messages;
+
+                if (!messages.length) {
+                    messagesDiv.innerHTML = "<p class='loading'>No messages received yet.</p>";
+                    return;
+                }
+
+                messagesDiv.innerHTML = messages.map(m => `
+                    <div class="message">
+                        <span class="sender">${m.sender}</span><br>
+                        ${m.text}<br>
+                        <span class="time">${m.time}</span>
+                    </div>
+                `).join("");
+
+            } catch (err) {
+                messagesDiv.innerHTML = "<p class='loading'>⚠️ Failed to fetch messages.</p>";
+                console.error(err);
+            }
+        }
+
+        async function summarizeMessages() {
+            const summaryDiv = document.getElementById("summary");
+            summaryDiv.innerHTML = "<p class='loading'>Summarizing... please wait.</p>";
+
+            try {
+                const response = await fetch("/summarize", { method: "POST" });
+                const data = await response.json();
+
+                if (data.error) {
+                    summaryDiv.innerHTML = `<p class='loading'>⚠️ ${data.error}</p>`;
+                } else {
+                    summaryDiv.innerHTML = `<p>${data.summary}</p>`;
+                }
+            } catch (err) {
+                summaryDiv.innerHTML = "<p class='loading'>⚠️ Failed to summarize messages.</p>";
+                console.error(err);
+            }
+        }
     </script>
 </body>
 </html>
+
 
 
 
